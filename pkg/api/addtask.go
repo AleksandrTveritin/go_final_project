@@ -38,6 +38,7 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверка обязательного поля Title
 	if req.Title == "" {
 		writeJSON(w, http.StatusBadRequest, TaskResponse{
 			Error: "Task title is required",
@@ -45,16 +46,19 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Обработка даты
 	now := time.Now()
 	today := now.Format(DateFormat)
 
-	// Если дата не указана — установить сегодняшнюю
-	if req.Date == "" {
+	switch req.Date {
+	case "today":
+		req.Date = today
+	case "":
 		req.Date = today
 	}
 
 	// Проверка формата даты
-	reqDate, err := time.Parse(DateFormat, req.Date)
+	date, err := time.Parse(DateFormat, req.Date)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, TaskResponse{
 			Error: "Invalid date format, expected YYYYMMDD",
@@ -62,27 +66,30 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Если дата в прошлом — пересчитываем
-	if reqDate.Before(now) {
+	// Если дата в прошлом
+	if date.Before(now) {
 		if req.Repeat == "" {
+			// Если нет правила повторения - используем сегодняшнюю дату
 			req.Date = today
 		} else {
-			next, err := NextDate(now, req.Date, req.Repeat)
-			if err != nil {
-				writeJSON(w, http.StatusBadRequest, TaskResponse{
-					Error: err.Error(),
-				})
-				return
+			// Для правила "d 1" используем сегодняшнюю дату
+			if req.Repeat == "d 1" {
+				req.Date = today
+			} else {
+				// Для других правил вычисляем следующую дату
+				next, err := NextDate(now, req.Date, req.Repeat)
+				if err != nil {
+					writeJSON(w, http.StatusBadRequest, TaskResponse{
+						Error: err.Error(),
+					})
+					return
+				}
+				req.Date = next
 			}
-			req.Date = next
 		}
 	}
 
-	// Если дата — сегодня: не пересчитываем, даже если есть repeat
-	if reqDate.Equal(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())) {
-		req.Date = today
-	}
-
+	// Создаем задачу в БД
 	task := &db.Task{
 		Date:    req.Date,
 		Title:   req.Title,
