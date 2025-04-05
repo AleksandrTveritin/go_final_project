@@ -150,7 +150,6 @@ func monthlyRepeat(now, date time.Time, parts []string) (string, error) {
 			_, month, day := date.Date()
 			currentMonth := int(month)
 
-			// Check if month is specified and matches
 			if len(months) > 0 {
 				monthMatch := false
 				for _, m := range months {
@@ -164,7 +163,6 @@ func monthlyRepeat(now, date time.Time, parts []string) (string, error) {
 				}
 			}
 
-			// Check day
 			for _, d := range days {
 				switch {
 				case d > 0 && day == d:
