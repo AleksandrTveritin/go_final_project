@@ -26,7 +26,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseInt(idStr, Base10, BitSize64)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: "Invalid task ID",
@@ -42,7 +42,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, TaskResponse{
+	writeJSON(w, http.StatusOK, Task{
 		ID:      idStr,
 		Date:    task.Date,
 		Title:   task.Title,
@@ -61,7 +61,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 // 6. Обновление задачи в базе данных с использованием функции db.UpdateTask. Если задача не найдена, то возвращается ошибка.
 // 7. Возвращение ответа в формате JSON.
 func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
-	var req TaskRequest
+	var req Task
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: "Invalid JSON format",
@@ -146,7 +146,10 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 // 7. Обновление даты задачи в базе данных с использованием функции db.UpdateDate. Если обновление не удалось, то возвращается ошибка.
 // 8. Возвращение ответа в формате JSON.
 func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	switch r.Method {
+	case http.MethodPost:
+
+	default:
 		writeJSON(w, http.StatusMethodNotAllowed, ErrorResponse{Error: "Only POST method allowed"})
 		return
 	}
@@ -164,13 +167,15 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if task.Repeat == "" {
+	switch task.Repeat {
+	case "":
 		if err := db.DeleteTask(id); err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "Failed to delete task"})
 			return
 		}
-	} else {
-		baseDate, err := time.Parse("20060102", task.Date)
+
+	default:
+		baseDate, err := time.Parse(DateFormat, task.Date)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "Invalid task date format"})
 			return
@@ -200,7 +205,9 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 // 5. Удаление задачи из базы данных с использованием функции db.DeleteTask. Если задача не найдена, то возвращается ошибка.
 // 6. Возвращение ответа в формате JSON.
 func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
+	switch r.Method {
+	case http.MethodDelete:
+	default:
 		writeJSON(w, http.StatusMethodNotAllowed, ErrorResponse{
 			Error: "Method not allowed",
 		})
@@ -208,7 +215,8 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idStr := r.URL.Query().Get("id")
-	if idStr == "" {
+	switch {
+	case idStr == "":
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: "Task ID is required",
 		})
@@ -216,25 +224,24 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := strconv.ParseInt(idStr, Base10, BitSize64)
-	if err != nil || id <= 0 {
+	switch {
+	case err != nil, id <= 0:
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: "Invalid task ID format",
 		})
 		return
 	}
 
-	if err := db.DeleteTask(id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{
-				Error: err.Error(),
-			})
-		} else {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{
-				Error: "Could not delete task",
-			})
-		}
-		return
+	switch err := db.DeleteTask(id); {
+	case err == nil:
+		writeJSON(w, http.StatusOK, struct{}{})
+	case strings.Contains(err.Error(), "not found"):
+		writeJSON(w, http.StatusNotFound, ErrorResponse{
+			Error: err.Error(),
+		})
+	default:
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error: "Could not delete task",
+		})
 	}
-
-	writeJSON(w, http.StatusOK, struct{}{})
 }

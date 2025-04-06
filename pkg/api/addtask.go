@@ -20,53 +20,46 @@ import (
 // 7. Создание задачи в БД. Если возникает ошибка, то возвращается ошибка.
 // 8. Возвращение идентификатора созданной задачи в формате JSON.
 func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, TaskAddResponse{
-			Error: "Method not allowed",
-		})
-		return
-	}
+	switch r.Method {
+	case http.MethodPost:
+		var req Task
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, TaskAddResponse{
+				Error: "Invalid JSON format",
+			})
+			return
+		}
 
-	var req TaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, TaskAddResponse{
-			Error: "Invalid JSON format",
-		})
-		return
-	}
+		if req.Title == "" {
+			writeJSON(w, http.StatusBadRequest, TaskAddResponse{
+				Error: "Task title is required",
+			})
+			return
+		}
 
-	if req.Title == "" {
-		writeJSON(w, http.StatusBadRequest, TaskAddResponse{
-			Error: "Task title is required",
-		})
-		return
-	}
+		now := time.Now()
+		today := now.Format(DateFormat)
 
-	now := time.Now()
-	today := now.Format(DateFormat)
-
-	switch req.Date {
-	case "today":
-		req.Date = today
-	case "":
-		req.Date = today
-	}
-
-	date, err := time.Parse(DateFormat, req.Date)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, TaskAddResponse{
-			Error: "Invalid date format, expected YYYYMMDD",
-		})
-		return
-	}
-
-	if date.Before(now) {
-		if req.Repeat == "" {
+		switch req.Date {
+		case "today", "":
 			req.Date = today
-		} else {
-			if req.Repeat == "d 1" {
+		}
+
+		date, err := time.Parse(DateFormat, req.Date)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, TaskAddResponse{
+				Error: "Invalid date format, expected YYYYMMDD",
+			})
+			return
+		}
+
+		if date.Before(now) {
+			switch {
+			case req.Repeat == "":
 				req.Date = today
-			} else {
+			case req.Repeat == "d 1":
+				req.Date = today
+			default:
 				next, err := NextDate(now, req.Date, req.Repeat)
 				if err != nil {
 					writeJSON(w, http.StatusBadRequest, TaskAddResponse{
@@ -77,24 +70,29 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 				req.Date = next
 			}
 		}
-	}
 
-	task := &db.Task{
-		Date:    req.Date,
-		Title:   req.Title,
-		Comment: req.Comment,
-		Repeat:  req.Repeat,
-	}
+		task := &db.Task{
+			Date:    req.Date,
+			Title:   req.Title,
+			Comment: req.Comment,
+			Repeat:  req.Repeat,
+		}
 
-	id, err := db.AddTask(task)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, TaskAddResponse{
-			Error: "Failed to create task",
+		id, err := db.AddTask(task)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, TaskAddResponse{
+				Error: "Failed to create task",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, TaskAddResponse{
+			ID: strconv.FormatInt(id, Base10),
 		})
-		return
-	}
 
-	writeJSON(w, http.StatusOK, TaskAddResponse{
-		ID: strconv.FormatInt(id, Base10),
-	})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, TaskAddResponse{
+			Error: "Method not allowed",
+		})
+	}
 }

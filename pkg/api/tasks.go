@@ -8,7 +8,7 @@ import (
 )
 
 type TasksResponse struct {
-	Tasks []TaskResponse `json:"tasks"`
+	Tasks []Task `json:"tasks"`
 }
 
 // TasksHandler - обработчик HTTP-запросов для получения списка задач.
@@ -25,7 +25,7 @@ func TasksHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, err := db.GetTasks(DefaultTaskLimit, "")
+	tasks, err := db.GetTasks(DefaultTaskLimit)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{
 			Error: "Failed to get tasks",
@@ -33,9 +33,9 @@ func TasksHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respTasks := make([]TaskResponse, 0, len(tasks))
+	respTasks := make([]Task, 0, len(tasks))
 	for _, task := range tasks {
-		respTasks = append(respTasks, TaskResponse{
+		respTasks = append(respTasks, Task{
 			ID:      strconv.FormatInt(task.ID, Base10),
 			Date:    task.Date,
 			Title:   task.Title,

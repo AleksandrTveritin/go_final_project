@@ -16,21 +16,10 @@ var (
 	ErrInvalidDay       = errors.New("invalid day value")
 	ErrInvalidMonth     = errors.New("invalid month value")
 	ErrInvalidWeekday   = errors.New("invalid weekday value")
-	ErrIntervalTooLarge = errors.New("interval too large")
+	ErrIntervalTooLarge = errors.New("interval must be between 1 and 400")
 )
 
-// NextDate - функция для вычисления следующей даты на основе текущей даты, даты задачи и правила повторения.
-// Она выполняет следующие шаги:
-// 1. Проверка наличия правила повторения. Если правило не указано, то возвращается ошибка.
-// 2. Парсинг даты задачи. Если дата имеет неверный формат, то возвращается ошибка.
-// 3. Разделение правила повторения на части.
-// 4. В зависимости от первой части правила повторения вызывается соответствующая функция для вычисления следующей даты:
-//   - "d" - dailyRepeat
-//   - "y" - yearlyRepeat
-//   - "w" - weeklyRepeat
-//   - "m" - monthlyRepeat
-//
-// 5. Если первая часть правила повторения не поддерживается, то возвращается ошибка.
+// NextDate вычисляет следующую дату выполнения задачи
 func NextDate(now time.Time, dateStr string, repeat string) (string, error) {
 	if repeat == "" {
 		return "", ErrEmptyRepeat
@@ -42,7 +31,7 @@ func NextDate(now time.Time, dateStr string, repeat string) (string, error) {
 	}
 
 	parts := strings.Fields(repeat)
-	if len(parts) == 0 {
+	if len(parts) < 1 {
 		return "", ErrInvalidFormat
 	}
 
@@ -60,13 +49,7 @@ func NextDate(now time.Time, dateStr string, repeat string) (string, error) {
 	}
 }
 
-// dailyRepeat - функция для вычисления следующей даты на основе текущей даты, даты задачи и правила повторения "d".
-// Она выполняет следующие шаги:
-// 1. Проверка формата правила повторения. Если правило имеет неверный формат, то возвращается ошибка.
-// 2. Преобразование второй части правила повторения в целое число. Если преобразование не удалось, то возвращается ошибка.
-// 3. Проверка интервала повторения. Если интервал меньше или равен 0 или больше 400, то возвращается ошибка.
-// 4. Вычисление следующей даты с учетом интервала повторения. Если следующая дата уже наступила, то вычисление продолжается.
-// 5. Возвращение следующей даты в формате YYYYMMDD.
+// dailyRepeat обрабатывает ежедневное повторение
 func dailyRepeat(now, date time.Time, parts []string) (string, error) {
 	if len(parts) != 2 {
 		return "", ErrInvalidFormat
@@ -77,40 +60,34 @@ func dailyRepeat(now, date time.Time, parts []string) (string, error) {
 		return "", ErrInvalidFormat
 	}
 
-	if interval <= 0 || interval > 400 {
+	if interval < 1 || interval > 400 {
 		return "", ErrIntervalTooLarge
 	}
 
+	nextDate := date
 	for {
-		date = date.AddDate(0, 0, interval)
-		if afterNow(date, now) {
+		nextDate = nextDate.AddDate(0, 0, interval)
+		if isAfter(trimToDay(nextDate), trimToDay(now)) {
 			break
 		}
 	}
 
-	return date.Format(DateFormat), nil
+	return nextDate.Format(DateFormat), nil
 }
 
-// yearlyRepeat - функция для вычисления следующей даты на основе текущей даты и даты задачи с ежегодным повторением.
-// Она выполняет следующие шаги:
-// 1. Вычисление следующей даты с учетом ежегодного повторения. Если следующая дата уже наступила, то вычисление продолжается.
-// 2. Возвращение следующей даты в формате YYYYMMDD.
+// yearlyRepeat обрабатывает ежегодное повторение
 func yearlyRepeat(now, date time.Time) (string, error) {
+	nextDate := date
 	for {
-		date = date.AddDate(1, 0, 0)
-		if afterNow(date, now) {
+		nextDate = nextDate.AddDate(1, 0, 0)
+		if isAfter(trimToDay(nextDate), trimToDay(now)) {
 			break
 		}
 	}
-	return date.Format(DateFormat), nil
+	return nextDate.Format(DateFormat), nil
 }
 
-// weeklyRepeat - функция для вычисления следующей даты на основе текущей даты, даты задачи и правила повторения "w".
-// Она выполняет следующие шаги:
-// 1. Проверка формата правила повторения. Если правило имеет неверный формат, то возвращается ошибка.
-// 2. Преобразование второй части правила повторения в список дней недели. Если преобразование не удалось или день недели имеет неверное значение, то возвращается ошибка.
-// 3. Вычисление следующей даты с учетом еженедельного повторения. Если следующая дата уже наступила, то вычисление продолжается.
-// 4. Проверка, является ли день недели следующей даты одним из дней, указанных в правиле повторения. Если да, то возвращается следующая дата в формате YYYYMMDD.
+// weeklyRepeat обрабатывает еженедельное повторение
 func weeklyRepeat(now, date time.Time, parts []string) (string, error) {
 	if len(parts) != 2 {
 		return "", ErrInvalidFormat
@@ -127,30 +104,24 @@ func weeklyRepeat(now, date time.Time, parts []string) (string, error) {
 		days = append(days, day)
 	}
 
+	nextDate := date
 	for {
-		date = date.AddDate(0, 0, 1)
-		if afterNow(date, now) {
-			weekday := int(date.Weekday())
+		nextDate = nextDate.AddDate(0, 0, 1)
+		if isAfter(trimToDay(nextDate), trimToDay(now)) {
+			weekday := int(nextDate.Weekday())
 			if weekday == 0 {
-				weekday = 7 // Sunday is 7
+				weekday = 7 // Воскресенье = 7
 			}
-
 			for _, d := range days {
 				if weekday == d {
-					return date.Format(DateFormat), nil
+					return nextDate.Format(DateFormat), nil
 				}
 			}
 		}
 	}
 }
 
-// monthlyRepeat - функция для вычисления следующей даты на основе текущей даты, даты задачи и правила повторения "m".
-// Она выполняет следующие шаги:
-// 1. Проверка формата правила повторения. Если правило имеет неверный формат, то возвращается ошибка.
-// 2. Преобразование второй части правила повторения в список дней месяца. Если преобразование не удалось или день месяца имеет неверное значение, то возвращается ошибка.
-// 3. Если в правиле повторения указаны месяцы, то преобразование третьей части правила повторения в список месяцев. Если преобразование не удалось или месяц имеет неверное значение, то возвращается ошибка.
-// 4. Вычисление следующей даты с учетом ежемесячного повторения. Если следующая дата уже наступила, то вычисление продолжается.
-// 5. Проверка, является ли день месяца следующей даты одним из дней, указанных в правиле повторения. Если да, то возвращается следующая дата в формате YYYYMMDD.
+// monthlyRepeat обрабатывает ежемесячное повторение
 func monthlyRepeat(now, date time.Time, parts []string) (string, error) {
 	if len(parts) < 2 {
 		return "", ErrInvalidFormat
@@ -180,82 +151,67 @@ func monthlyRepeat(now, date time.Time, parts []string) (string, error) {
 		}
 	}
 
+	nextDate := date
 	for {
-		date = date.AddDate(0, 0, 1)
-		if afterNow(date, now) {
-			_, month, day := date.Date()
-			currentMonth := int(month)
+		nextDate = nextDate.AddDate(0, 0, 1)
+		if isAfter(trimToDay(nextDate), trimToDay(now)) {
+			currentMonth := int(nextDate.Month())
+			currentDay := nextDate.Day()
 
 			if len(months) > 0 {
-				monthMatch := false
+				validMonth := false
 				for _, m := range months {
 					if m == currentMonth {
-						monthMatch = true
+						validMonth = true
 						break
 					}
 				}
-				if !monthMatch {
+				if !validMonth {
 					continue
 				}
 			}
 
 			for _, d := range days {
 				switch {
-				case d > 0 && day == d:
-					return date.Format(DateFormat), nil
-				case d == -1 && isLastDayOfMonth(date):
-					return date.Format(DateFormat), nil
-				case d == -2 && isPenultimateDayOfMonth(date):
-					return date.Format(DateFormat), nil
+				case d > 0 && currentDay == d:
+					return nextDate.Format(DateFormat), nil
+				case d == -1 && isLastDayOfMonth(nextDate):
+					return nextDate.Format(DateFormat), nil
+				case d == -2 && isPenultimateDayOfMonth(nextDate):
+					return nextDate.Format(DateFormat), nil
 				}
 			}
 		}
 	}
 }
 
-// afterNow - функция для проверки, является ли дата после текущей даты.
-// Она выполняет следующие шаги:
-// 1. Сравнение даты с текущей датой.
-// 2. Возвращение true, если дата после текущей даты, иначе false.
-func afterNow(date, now time.Time) bool {
-	return date.After(now)
+// Вспомогательные функции
+func trimToDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
-// isLastDayOfMonth - функция для проверки, является ли дата последним днем месяца.
-// Она выполняет следующие шаги:
-// 1. Добавление одного дня к дате.
-// 2. Сравнение месяца следующей даты с месяцем исходной даты.
-// 3. Возвращение true, если месяцы различаются, иначе false.
+func isAfter(a, b time.Time) bool {
+	return a.After(b)
+}
+
 func isLastDayOfMonth(date time.Time) bool {
 	return date.AddDate(0, 0, 1).Month() != date.Month()
 }
 
-// isPenultimateDayOfMonth - функция для проверки, является ли дата предпоследним днем месяца.
-// Она выполняет следующие шаги:
-// 1. Добавление двух дней к дате.
-// 2. Сравнение месяца следующей даты с месяцем исходной даты.
-// 3. Возвращение true, если месяцы различаются, иначе false.
 func isPenultimateDayOfMonth(date time.Time) bool {
 	return date.AddDate(0, 0, 2).Month() != date.Month()
 }
 
-// NextDateHandler - обработчик HTTP-запросов для вычисления следующей даты на основе текущей даты, даты задачи и правила повторения.
-// Он выполняет следующие шаги:
-// 1. Проверка метода запроса. Если метод не GET, то возвращается ошибка.
-// 2. Получение параметров запроса: now, date и repeat.
-// 3. Если параметр now не указан, то используется текущая дата. В противном случае, параметр now парсится в формате YYYYMMDD. Если парсинг не удался, то возвращается ошибка.
-// 4. Вычисление следующей даты с использованием функции NextDate. Если возникает ошибка, то возвращается ошибка.
-// 5. Установка заголовка Content-Type в "text/plain".
-// 6. Возвращение следующей даты в формате YYYYMMDD.
+// NextDateHandler обрабатывает HTTP-запросы для вычисления следующей даты
 func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	nowStr := r.FormValue("now")
-	dateStr := r.FormValue("date")
-	repeat := r.FormValue("repeat")
+	nowStr := r.URL.Query().Get("now")
+	dateStr := r.URL.Query().Get("date")
+	repeat := r.URL.Query().Get("repeat")
 
 	var now time.Time
 	if nowStr == "" {

@@ -36,18 +36,12 @@ func AddTask(task *Task) (int64, error) {
 	return res.LastInsertId()
 }
 
-func GetTasks(limit int, search string) ([]*Task, error) {
+func GetTasks(limit int) ([]*Task, error) {
 	query := `SELECT id, date, title, comment, repeat 
               FROM scheduler 
               WHERE date >= ?`
 
 	params := []interface{}{time.Now().Format("20060102")}
-
-	if search != "" {
-		query += ` AND (title LIKE ? OR comment LIKE ?)`
-		searchParam := "%" + search + "%"
-		params = append(params, searchParam, searchParam)
-	}
 
 	query += ` ORDER BY date ASC, id ASC LIMIT ?`
 	params = append(params, limit)
