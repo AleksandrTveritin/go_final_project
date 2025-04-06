@@ -3,28 +3,25 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/AleksandrTveritin/go_final_project/pkg/db"
 )
 
-const DateFormat = "20060102"
-
-type TaskRequest struct {
-	Date    string `json:"date"`
-	Title   string `json:"title"`
-	Comment string `json:"comment"`
-	Repeat  string `json:"repeat"`
-}
-
-type TaskResponse struct {
-	ID    int64  `json:"id,omitempty"`
-	Error string `json:"error,omitempty"`
-}
-
+// AddTaskHandler - обработчик HTTP-запросов для добавления новой задачи.
+// Он выполняет следующие шаги:
+// 1. Проверка метода запроса. Если метод не POST, то возвращается ошибка.
+// 2. Декодирование тела запроса в структуру TaskRequest. Если возникает ошибка, то возвращается ошибка.
+// 3. Проверка обязательного поля Title. Если поле не заполнено, то возвращается ошибка.
+// 4. Обработка даты. Если дата не указана или указана как "today", то используется сегодняшняя дата.
+// 5. Проверка формата даты. Если дата имеет неверный формат, то возвращается ошибка.
+// 6. Если дата в прошлом, то используется правило повторения для вычисления следующей даты.
+// 7. Создание задачи в БД. Если возникает ошибка, то возвращается ошибка.
+// 8. Возвращение идентификатора созданной задачи в формате JSON.
 func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, TaskResponse{
+		writeJSON(w, http.StatusMethodNotAllowed, TaskAddResponse{
 			Error: "Method not allowed",
 		})
 		return
@@ -32,21 +29,19 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req TaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, TaskResponse{
+		writeJSON(w, http.StatusBadRequest, TaskAddResponse{
 			Error: "Invalid JSON format",
 		})
 		return
 	}
 
-	// Проверка обязательного поля Title
 	if req.Title == "" {
-		writeJSON(w, http.StatusBadRequest, TaskResponse{
+		writeJSON(w, http.StatusBadRequest, TaskAddResponse{
 			Error: "Task title is required",
 		})
 		return
 	}
 
-	// Обработка даты
 	now := time.Now()
 	today := now.Format(DateFormat)
 
@@ -57,29 +52,24 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		req.Date = today
 	}
 
-	// Проверка формата даты
 	date, err := time.Parse(DateFormat, req.Date)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, TaskResponse{
+		writeJSON(w, http.StatusBadRequest, TaskAddResponse{
 			Error: "Invalid date format, expected YYYYMMDD",
 		})
 		return
 	}
 
-	// Если дата в прошлом
 	if date.Before(now) {
 		if req.Repeat == "" {
-			// Если нет правила повторения - используем сегодняшнюю дату
 			req.Date = today
 		} else {
-			// Для правила "d 1" используем сегодняшнюю дату
 			if req.Repeat == "d 1" {
 				req.Date = today
 			} else {
-				// Для других правил вычисляем следующую дату
 				next, err := NextDate(now, req.Date, req.Repeat)
 				if err != nil {
-					writeJSON(w, http.StatusBadRequest, TaskResponse{
+					writeJSON(w, http.StatusBadRequest, TaskAddResponse{
 						Error: err.Error(),
 					})
 					return
@@ -89,7 +79,6 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Создаем задачу в БД
 	task := &db.Task{
 		Date:    req.Date,
 		Title:   req.Title,
@@ -99,19 +88,13 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	id, err := db.AddTask(task)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, TaskResponse{
+		writeJSON(w, http.StatusInternalServerError, TaskAddResponse{
 			Error: "Failed to create task",
 		})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, TaskResponse{
-		ID: id,
+	writeJSON(w, http.StatusOK, TaskAddResponse{
+		ID: strconv.FormatInt(id, Base10),
 	})
-}
-
-func writeJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }
