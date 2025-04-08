@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/AleksandrTveritin/go_final_project/pkg/config"
 )
 
 var (
@@ -25,7 +27,7 @@ func NextDate(now time.Time, dateStr string, repeat string) (string, error) {
 		return "", ErrEmptyRepeat
 	}
 
-	date, err := time.Parse(DateFormat, dateStr)
+	date, err := time.Parse(config.DateFormat, dateStr)
 	if err != nil {
 		return "", ErrInvalidDate
 	}
@@ -60,7 +62,7 @@ func dailyRepeat(now, date time.Time, parts []string) (string, error) {
 		return "", ErrInvalidFormat
 	}
 
-	if interval < 1 || interval > 400 {
+	if interval < 1 || interval > config.MaxDailyRepeatInterval {
 		return "", ErrIntervalTooLarge
 	}
 
@@ -72,7 +74,7 @@ func dailyRepeat(now, date time.Time, parts []string) (string, error) {
 		}
 	}
 
-	return nextDate.Format(DateFormat), nil
+	return nextDate.Format(config.DateFormat), nil
 }
 
 // yearlyRepeat обрабатывает ежегодное повторение
@@ -84,7 +86,7 @@ func yearlyRepeat(now, date time.Time) (string, error) {
 			break
 		}
 	}
-	return nextDate.Format(DateFormat), nil
+	return nextDate.Format(config.DateFormat), nil
 }
 
 // weeklyRepeat обрабатывает еженедельное повторение
@@ -114,7 +116,7 @@ func weeklyRepeat(now, date time.Time, parts []string) (string, error) {
 			}
 			for _, d := range days {
 				if weekday == d {
-					return nextDate.Format(DateFormat), nil
+					return nextDate.Format(config.DateFormat), nil
 				}
 			}
 		}
@@ -174,11 +176,11 @@ func monthlyRepeat(now, date time.Time, parts []string) (string, error) {
 			for _, d := range days {
 				switch {
 				case d > 0 && currentDay == d:
-					return nextDate.Format(DateFormat), nil
+					return nextDate.Format(config.DateFormat), nil
 				case d == -1 && isLastDayOfMonth(nextDate):
-					return nextDate.Format(DateFormat), nil
+					return nextDate.Format(config.DateFormat), nil
 				case d == -2 && isPenultimateDayOfMonth(nextDate):
-					return nextDate.Format(DateFormat), nil
+					return nextDate.Format(config.DateFormat), nil
 				}
 			}
 		}
@@ -218,7 +220,7 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 		now = time.Now()
 	} else {
 		var err error
-		now, err = time.Parse(DateFormat, nowStr)
+		now, err = time.Parse(config.DateFormat, nowStr)
 		if err != nil {
 			http.Error(w, "Invalid now parameter", http.StatusBadRequest)
 			return

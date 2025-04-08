@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AleksandrTveritin/go_final_project/pkg/config"
 	"github.com/AleksandrTveritin/go_final_project/pkg/db"
 )
 
@@ -26,7 +27,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.ParseInt(idStr, Base10, BitSize64)
+	id, err := strconv.ParseInt(idStr, config.Base10, config.BitSize64)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: "Invalid task ID",
@@ -76,7 +77,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.ParseInt(req.ID, Base10, BitSize64)
+	id, err := strconv.ParseInt(req.ID, config.Base10, config.BitSize64)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: "Invalid task ID",
@@ -92,7 +93,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Repeat != "" {
-		if _, err := NextDate(time.Now(), time.Now().Format(DateFormat), req.Repeat); err != nil {
+		if _, err := NextDate(time.Now(), time.Now().Format(config.DateFormat), req.Repeat); err != nil {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{
 				Error: "Invalid repeat format",
 			})
@@ -101,7 +102,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	today := now.Format(DateFormat)
+	today := now.Format(config.DateFormat)
 
 	switch {
 	case req.Date == "":
@@ -109,7 +110,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	case req.Date == "today":
 		req.Date = today
 	default:
-		if _, err := time.Parse(DateFormat, req.Date); err != nil {
+		if _, err := time.Parse(config.DateFormat, req.Date); err != nil {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{
 				Error: "Invalid date format, expected YYYYMMDD",
 			})
@@ -155,7 +156,7 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idStr := r.URL.Query().Get("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseInt(idStr, config.Base10, config.BitSize64)
 	if err != nil || id <= 0 {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid task ID"})
 		return
@@ -175,7 +176,7 @@ func taskDoneHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		baseDate, err := time.Parse(DateFormat, task.Date)
+		baseDate, err := time.Parse(config.DateFormat, task.Date)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "Invalid task date format"})
 			return
@@ -223,7 +224,7 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.ParseInt(idStr, Base10, BitSize64)
+	id, err := strconv.ParseInt(idStr, config.Base10, config.BitSize64)
 	switch {
 	case err != nil, id <= 0:
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{

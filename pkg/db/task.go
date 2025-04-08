@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/AleksandrTveritin/go_final_project/pkg/config"
 )
 
 type Task struct {
@@ -41,7 +43,7 @@ func GetTasks(limit int) ([]*Task, error) {
               FROM scheduler 
               WHERE date >= ?`
 
-	params := []interface{}{time.Now().Format("20060102")}
+	params := []interface{}{time.Now().Format(config.DateFormat)}
 
 	query += ` ORDER BY date ASC, id ASC LIMIT ?`
 	params = append(params, limit)
@@ -148,7 +150,7 @@ func validateTask(task *Task) error {
 		return fmt.Errorf("title is required")
 	}
 
-	if _, err := time.Parse("20060102", task.Date); err != nil {
+	if _, err := time.Parse(config.DateFormat, task.Date); err != nil {
 		return fmt.Errorf("invalid date format")
 	}
 

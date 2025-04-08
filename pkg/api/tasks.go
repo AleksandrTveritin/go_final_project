@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/AleksandrTveritin/go_final_project/pkg/config"
 	"github.com/AleksandrTveritin/go_final_project/pkg/db"
 )
 
@@ -25,7 +26,7 @@ func TasksHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, err := db.GetTasks(DefaultTaskLimit)
+	tasks, err := db.GetTasks(config.DefaultTaskLimit)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{
 			Error: "Failed to get tasks",
@@ -36,7 +37,7 @@ func TasksHandler(w http.ResponseWriter, r *http.Request) {
 	respTasks := make([]Task, 0, len(tasks))
 	for _, task := range tasks {
 		respTasks = append(respTasks, Task{
-			ID:      strconv.FormatInt(task.ID, Base10),
+			ID:      strconv.FormatInt(task.ID, config.Base10),
 			Date:    task.Date,
 			Title:   task.Title,
 			Comment: task.Comment,
